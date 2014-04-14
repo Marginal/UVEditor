@@ -15,7 +15,7 @@ module Marginal
       end
 
       def self.GoodBye(model)
-        fail if !@@known_models.include?(model)
+        return if !@@known_models.include?(model)
         @@known_models.delete(model)
         Marginal::UVEditor::theeditor.goodbye(model)
       end
@@ -35,32 +35,32 @@ module Marginal
 
       def onDeleteModel(model)
         # This doesn't fire on closing the model, so currently worthless. Maybe it will work in the future.
-        # p "onDeleteModel #{model}"
+        p "onDeleteModel #{model}" if TraceEvents
         Marginal::UVEditor::UVObserver::GoodBye(model)
       end
 
       def onEraseAll(model)
         # Currently only works on Windows.
-        # p "onEraseAll #{model}"
+        p "onEraseAll #{model}" if TraceEvents
         Marginal::UVEditor::UVObserver::GoodBye(model)
       end
 
       def onTransactionStart(model)
-        # p "onTransactionStart #{model}"
+        p "onTransactionStart #{model}" if TraceEvents
       end
 
       def onTransactionCommit(model)
-        # p "onTransactionCommit #{model}"
+        p "onTransactionCommit #{model}" if TraceEvents
         Marginal::UVEditor::theeditor.transaction()
       end
 
       def onTransactionRedo(model)
-        # p "onTransactionRedo #{model}"
+        p "onTransactionRedo #{model}" if TraceEvents
         Marginal::UVEditor::theeditor.transaction()
       end
 
       def onTransactionUndo(model)
-        # p "onTransactionUndo #{model}"
+        p "onTransactionUndo #{model}" if TraceEvents
         Marginal::UVEditor::theeditor.transaction()
       end
 
@@ -73,12 +73,12 @@ module Marginal
       end
 
       def onSelectionBulkChange(selection)
-        # p 'onSelectionBulkChange ' + selection.inspect
+        p 'onSelectionBulkChange ' + selection.inspect if TraceEvents
         Marginal::UVEditor::theeditor.newselection(selection)
       end
 
       def onSelectionCleared(selection)
-        # p 'onSelectionCleared ' + selection.inspect
+        p 'onSelectionCleared ' + selection.inspect if TraceEvents
         Marginal::UVEditor::theeditor.clearselection()
       end
 
@@ -106,7 +106,7 @@ module Marginal
       end
 
       def launch()
-        # p 'launch'
+        p 'launch' if TraceEvents
         if !@dialog
           # https://github.com/thomthom/sketchup-webdialogs-the-lost-manual/wiki/Sizing-Window
           if RUBY_PLATFORM =~ /darwin/i
@@ -130,7 +130,7 @@ module Marginal
 
       def on_load
         # Remaining initialization, deferred 'til DOM is ready
-        # p 'on_load'
+        p 'on_load' if TraceEvents
         if Sketchup.active_model.selection.empty?
           clearselection()
         else
@@ -221,14 +221,14 @@ module Marginal
 
       # dialog about to be closed
       def on_close
-        # p 'on_close ' + @dialog.inspect
+        p 'on_close ' + @dialog.inspect if TraceEvents
         @dialog = nil
         clearselection()
       end
 
       # incoming!
       def on_startupdate
-        # p 'on_startupdate' + @dialog.inspect
+        p 'on_startupdate' + @dialog.inspect if TraceEvents
         return clearselection() if !@model.valid?	# we didn't notice that our model was closed on Mac
         @mytransaction = true
         @model.start_operation('Position Texture', false)
@@ -237,7 +237,7 @@ module Marginal
 
       # incoming!
       def on_update
-        # p 'on_update' + @dialog.inspect
+        p 'on_update' + @dialog.inspect if TraceEvents
         return clearselection() if !@model.valid?	# we didn't notice that our model was closed on Mac
         @mytransaction = true
         update_uvs = eval(@dialog.get_element_value('update_uvs'))
@@ -262,14 +262,14 @@ module Marginal
       end
 
       def on_cancelupdate
-        # p 'on_cancelupdate' + @dialog.inspect
+        p 'on_cancelupdate' + @dialog.inspect if TraceEvents
         @mytransaction = true
         @model.abort_operation if @model and @model.valid?
         @mytransaction = false
       end
 
       def on_finishupdate
-        # p 'on_finishupdate' + @dialog.inspect
+        p 'on_finishupdate' + @dialog.inspect if TraceEvents
         return clearselection() if !@model.valid?	# we didn't notice that our model was closed on Mac
         @mytransaction = true
         @model.commit_operation
@@ -301,13 +301,13 @@ module Marginal
         end
 
         def onNewModel(model)
-          # p 'onNewModel ' + model.inspect
+          p 'onNewModel ' + model.inspect if TraceEvents
           Marginal::UVEditor::UVObserver::Hello(model)
         end
 
         def onOpenModel(model)
           # onOpenModel can be called multiple times if the user re-opens the model from Explorer/Finder
-          # p 'onOpenModel ' + model.inspect
+          p 'onOpenModel ' + model.inspect if TraceEvents
           Marginal::UVEditor::UVObserver::Hello(model)
         end
 

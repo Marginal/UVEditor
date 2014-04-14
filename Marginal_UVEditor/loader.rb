@@ -5,7 +5,7 @@ module Marginal
   module UVEditor
 
     if !file_loaded?(__FILE__)
-      UI.menu("Tools").add_item('UV Editor') { p "launch #{@@theeditor.launch}" }
+      UI.menu("Tools").add_item('UV Editor') { @@theeditor.launch }
     end
     file_loaded(__FILE__)
 

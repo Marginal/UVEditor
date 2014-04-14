@@ -20,6 +20,9 @@ module Marginal
 
     Version = "0.10"
 
+    # Debug
+    TraceEvents = false
+
     extension = SketchupExtension.new('UVEditor', File.join(File.dirname(__FILE__), File.basename(__FILE__,'.rb'), 'loader.rb'))
 'SU2XPlane.rb'
     extension.description = 'Texture UV map editor.'
