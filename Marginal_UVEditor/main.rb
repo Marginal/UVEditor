@@ -108,8 +108,13 @@ module Marginal
       def launch()
         # p 'launch'
         if !@dialog
-          @dialog = UI::WebDialog.new('UV Editor', true, nil, 512, 512)
-          @dialog.allow_actions_from_host("getfirebug.com")	# for debugging on Windows
+          # https://github.com/thomthom/sketchup-webdialogs-the-lost-manual/wiki/Sizing-Window
+          if RUBY_PLATFORM =~ /darwin/i
+            @dialog = UI::WebDialog.new('UV Editor', false, 'UVEditor', 512, 512 + 69 + 22)
+          else
+            @dialog = UI::WebDialog.new('UV Editor', false, 'UVEditor', 512 + 16, 512 + 69 + 38)	# default Win7
+            @dialog.allow_actions_from_host("getfirebug.com")	# for debugging on Windows
+          end
           @dialog.set_file(File.join(File.dirname(__FILE__), 'Resources', 'uveditor.html'))
           @dialog.add_action_callback("on_load")         { |d,p| on_load() }
           @dialog.add_action_callback("on_startupdate")  { |d,p| on_startupdate() }
@@ -118,7 +123,8 @@ module Marginal
           @dialog.add_action_callback("on_cancelupdate") { |d,p| on_cancelupdate() }
           @dialog.set_on_close { on_close() }
         end
-        @dialog.show
+        # https://github.com/thomthom/sketchup-webdialogs-the-lost-manual/wiki/WebDialog.show-vs-WebDialog.show_modal
+        RUBY_PLATFORM =~ /darwin/i ? @dialog.show_modal : @dialog.show
         @dialog.bring_to_front
       end
 
