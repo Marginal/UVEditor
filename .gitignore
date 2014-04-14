@@ -1,0 +1,8 @@
+*.bak
+*.skb
+*~.skp
+AutoSave_*.skp
+*.rbz
+
+.DS_Store
+Thumbs.db
