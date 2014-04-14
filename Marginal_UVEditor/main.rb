@@ -161,12 +161,49 @@ module Marginal
         uvlookup = {}
         polys = []
 
+        # Determine most used material
         selection.each do |ent|
           if ent.typename == 'Face'	# not interested in anything else, and don't recurse into Components
+            [true,false].each do |front|
+              material = front ? ent.material : ent.back_material
+              if material and material.texture
+                usedmaterials[material] += ent.outer_loop.vertices.length + (front ? 1 : 0)	# weight towards front
+              end
+            end
+          end
+        end
+        return clearselection() if usedmaterials.empty?
+        byuse = usedmaterials.invert
+        mymaterial = byuse[byuse.keys.sort[-1]]	# most popular material
+
+        # Ensure material's texture is available in the file system
+        newfile = mymaterial.texture.filename
+        basename = mymaterial.texture.filename.split(/[\/\\:]+/)[-1]	# basename which handles \ on Mac
+        if !File.file?(newfile) || newfile==basename	# doesn't exist or unqualified
+          newfile = File.join(File.dirname(@model.path), basename)
+          if !File.file? newfile
+            selection.each do |ent|
+              if ent.typename == 'Face' and ent.material == mymaterial
+                raise "Can't write #{newfile}" if @tw.load(ent, true)==0 || @tw.write(ent, true, newfile)!=0
+                break
+              elsif ent.typename == 'Face' and ent.back_material == mymaterial
+                raise "Can't write #{newfile}" if @tw.load(ent, false)==0 || @tw.write(ent, false, newfile)!=0
+                break
+              end
+            end
+          end
+        end
+
+        selection.each do |ent|
+          if ent.typename != 'Face'
+            # selection.toggle(ent)	# not interested in anything else
+          elsif (!ent.material || !ent.material.texture || ent.material.texture.filename.split(/[\/\\:]+/)[-1]!=basename) && (!ent.back_material || !ent.back_material.texture || ent.back_material.texture.filename.split(/[\/\\:]+/)[-1]!=basename)
+            # selection.toggle(ent)	# doesn't use our texture
+          else
             uvHelp = ent.get_UVHelper(true, true, @tw)
             [true,false].each do |front|
               material = front ? ent.material : ent.back_material
-              next if not material or not material.texture
+              next if not material or not material.texture or material.texture.filename.split(/[\/\\:]+/)[-1]!=basename
               poly = []
               #pos = []	# debug
               ent.outer_loop.vertices.each do |vertex|
@@ -182,31 +219,9 @@ module Marginal
                 #pos << vertex	# debug
                 #pos << uv	# debug
               end
-              usedmaterials[material] += poly.length
               polys << poly
               @idxlookup[[ent,front]] = poly
               #p "old: #{pos.inspect} #{front}"	# debug
-            end
-          end
-        end
-
-        # Determine most used material
-        usedmaterials.delete(nil)
-        return clearselection() if usedmaterials.empty?
-        byuse = usedmaterials.invert
-        mymaterial = byuse[byuse.keys.sort[-1]]	# most popular material
-        return clearselection() if not mymaterial.texture
-
-        # Ensure material's texture is available in the file system
-        newfile = mymaterial.texture.filename
-        if !File.file? newfile
-          newfile = File.join(File.dirname(@model.path), mymaterial.texture.filename.split(/[\/\\:]+/)[-1])	# basename which handles \ on Mac
-          if !File.file? newfile
-            selection.each do |ent|
-              if ent.typename == 'Face' and ent.material == mymaterial
-                raise "Can't write #{newfile}" if @tw.load(ent, true)==0 || @tw.write(ent, true, newfile)!=0
-                break
-              end
             end
           end
         end
@@ -255,7 +270,7 @@ module Marginal
             uv = @uvs[indices[i]]
             pos << Geom::Point3d.new(uv[0],uv[1],1)
           end
-          ent.position_material(ent.material, pos, front)
+          ent.position_material(front ? ent.material : ent.back_material, pos, front)
           #p "new: #{pos.inspect} #{front}"
         end
         @mytransaction = false
