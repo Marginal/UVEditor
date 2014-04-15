@@ -108,9 +108,9 @@ function change_mode(newmode)
         uvs = saved_uvs;
         saved_uvs = undefined;
     }
-    document.getElementById('sb-label').disabled = document.getElementById('sb-data').disabled = true;
+    document.getElementById('sb-input').value = "";
+    document.getElementById('sb-input').disabled = true;
     document.getElementById('sb-label').innerHTML = "Measurements";
-    document.getElementById('sb-data').value = "";
 
     redraw();
 }
@@ -178,7 +178,7 @@ function on_mousedown(e)
     {
         if (Object.keys(selection).length)
         {
-            document.getElementById('sb-label').disabled = document.getElementById('sb-data').disabled = false;
+            document.getElementById('sb-input').disabled = false;
             switch (mode)
             {
             case modes.MOVE:
@@ -207,7 +207,7 @@ function on_mousedown(e)
                     selection[hits[i]] = true;	// latch selection
                 selection_is_temporary = true;
                 document.getElementById('sb-info').innerHTML = "Pick point to move. Shift = snap to pixels.";
-                document.getElementById('sb-label').disabled = document.getElementById('sb-data').disabled = false;
+                document.getElementById('sb-input').disabled = false;
                 document.getElementById('sb-label').innerHTML = "Pixels";
                 saved_uvs = uvs;
                 dragstart = uv2canvas(uvs[hits[0]]);
@@ -346,9 +346,9 @@ function on_mouseup(e)
         {
             window.location="skp:on_cancelupdate";
         }
-        document.getElementById('sb-label').disabled =  document.getElementById('sb-data').disabled = true;
+        document.getElementById('sb-input').value = "";
+        document.getElementById('sb-input').disabled = true;
         document.getElementById('sb-label').innerHTML = "Measurements";
-        document.getElementById('sb-data').value = "";
         dragstart = undefined;
         saved_uvs = undefined;
         if (selection_is_temporary) selection = {};
@@ -425,7 +425,7 @@ function apply(cursor, snap)
     case modes.MOVE:
         var uvdelta = uvround([(cursor[0]-dragstart[0])/scale/img.naturalWidth,
                                (dragstart[1]-cursor[1])/scale/img.naturalHeight]);	// canvas origin is top, uv orgin bottom
-        document.getElementById('sb-data').value = snap ?
+        document.getElementById('sb-input').value = snap ?
             Math.round(uvdelta[0]*img.naturalWidth) + ', ' + Math.round(uvdelta[1]*img.naturalWidth) :
             (uvdelta[0]*img.naturalWidth).toPrecision(6) + ', ' + (uvdelta[1]*img.naturalWidth).toPrecision(6);
         Object.keys(selection).forEach(uvs_move);
@@ -439,11 +439,11 @@ function apply(cursor, snap)
             var origin = canvas2uv(dragstart);
             if (snap) angle = Math.round(angle * 12/Math.PI) * Math.PI/12;	// round to nearest 15 degrees
             // console.log(angle, angle * 180/Math.PI);
-            document.getElementById('sb-data').value = snap ? Math.round(angle * 180/Math.PI) : (angle * 180/Math.PI).toPrecision(4); // XXX Math.abs(angle)
+            document.getElementById('sb-input').value = snap ? Math.round(angle * 180/Math.PI) : (angle * 180/Math.PI).toPrecision(4); // XXX Math.abs(angle)
             Object.keys(selection).forEach(uvs_rotate);
         }
         else
-            document.getElementById('sb-data').value = "0";
+            document.getElementById('sb-input').value = "0";
         break;
     }
     var changed_indices = Object.keys(selection);

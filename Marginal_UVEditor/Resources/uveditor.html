@@ -5,7 +5,7 @@
 <head>
 
   <meta http-equiv="content-type" content="text/html; charset=ISO-8859-1">
-  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta http-equiv="X-UA-Compatible" content="IE=9">
   <meta http-equiv="MSThemeCompatible" content="Yes">
 
   <!-- <script type="text/javascript" src="http://getfirebug.com/firebug-lite.js"></script>	<!-- Debug on Windows -->
@@ -21,7 +21,6 @@
     .wrapper { height: 100%; min-height: 100%; height: auto !important; margin: 0 auto -29px; }
     #container { position:absolute; top:40px; bottom:29px; left:0px; right:0px; overflow: hidden; }
     .imgresource { display:none; }
-    /* http://jeremyworboys.com/writing/toggle-buttons-without-javascript */
     [unselectable] { -webkit-user-select:none; -ms-user-select:none; user-select:none; }
     .tb-button { display:inline-block; }
     .tb-button input { display:none; margin:0; padding:0; }
@@ -31,13 +30,17 @@
     .tb-button input:enabled + label:hover { background:ButtonHighlight; border-color:ButtonShadow; }
     .tb-button input:checked + label img { box-shadow: 4px 4px 16px ButtonShadow inset; }
     .tb-button input:disabled + label img { opacity:0.33; filter:alpha(opacity=33); }
+    .vr { display:inline-block; width:1px; height:32px; background-color:ButtonShadow; }
     .sb-button { float:left; padding: 1px; margin:1px; margin-left:3px; margin-right:3px; background:Menu; border-style:solid; border-width:1px; border-radius:3px; border-color:Menu; }
     .sb-button:disabled { opacity:0.33; filter:alpha(opacity=33); }
     .sb-button:enabled:hover { background:ButtonHighlight; border-color:ButtonShadow; }
     .sb-info { margin:2px; margin-top:6px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-    .sb-label { float:right; margin:2px; margin-top:6px; color:GrayText }
-    .sb-label:enabled { color:ButtonText }
-    .sb-data { float:right; margin:2px; margin-top:3px; margin-right:12px; }
+    .sb-data { float:right; margin-top:2px; };
+    .sb-input { float:right; margin:2px; margin-right:12px; }
+    .sb-input:enabled { float:right; margin:2px; margin-right:12px; }
+    .sb-input:disabled { float:right; margin:2px; margin-right:12px; }
+    .sb-input + label { display:block; float:left; margin:2px; margin-top:4px; color:ButtonText; }
+    .sb-input:disabled + label { color:GrayText; }
   </style>
 
 </head>
@@ -57,6 +60,7 @@
         <input type="radio" name="tb" id="tb-select" onchange="change_mode(modes.SELECT)" checked disabled>
         <label for="tb-select" unselectable><img src="./tb_select.png"></label>
     </div>
+    <div class="vr"></div>
     <div class="tb-button">
         <input type="radio" name="tb" id="tb-move" onchange="change_mode(modes.MOVE)" disabled>
         <label for="tb-move" unselectable><img src="./tb_move.png"></label>
@@ -85,8 +89,10 @@
 
   <div class="statusbar">
     <button type="submit" class="sb-button" disabled><img src="./instructor.png"></button>
-    <input type=text id="sb-data" class="sb-data" disabled>
-    <div id="sb-label" class="sb-label" disabled></div>
+    <div class="sb-data">
+      <input type=text id="sb-input" class="sb-input" disabled>
+      <label id="sb-label" class="sb-label"></label>
+    </div>
     <div class="sb-info" id="sb-info"></div>
   </div>
 
