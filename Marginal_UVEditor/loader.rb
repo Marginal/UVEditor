@@ -5,7 +5,8 @@ module Marginal
   module UVEditor
 
     if !file_loaded?(__FILE__)
-      UI.menu("Tools").add_item('UV Editor') { @@theeditor.launch }
+      # reload main.rb in case user has installed an updated version
+      UI.menu("Tools").add_item('UV Editor') { load File.join(File.dirname(__FILE__), 'main.rb'); @@theeditor.launch }
     end
     file_loaded(__FILE__)
 

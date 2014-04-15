@@ -87,11 +87,6 @@ module Marginal
 
     # one per app
     class UVMain
-
-      # Rounding for UV values
-      Round = 8
-      Factor = 10.0 ** UVMain::Round
-      Inverse = 1/UVMain::Factor
  
       def initialize
         @dialog = nil
@@ -306,7 +301,20 @@ module Marginal
     end
 
 
+    # one-time initialisation
     if !file_loaded?(__FILE__)
+
+      # Rounding for UV values
+      Round = 8
+      Factor = 10.0 ** Round
+      Inverse = 1/Factor
+
+      # create a single instance and accessor for it
+      @@theeditor = UVMain.new
+
+      def self.theeditor
+        @@theeditor
+      end
 
       # one per app
       class UVAppObserver < Sketchup::AppObserver
@@ -331,13 +339,6 @@ module Marginal
       # on[Open|New]Model not sent for initial model - http://www.sketchup.com/intl/en/developer/docs/ourdoc/appobserver#onOpenModel
       UVAppObserver.new.onOpenModel(Sketchup.active_model)
       
-      # create a single instance and accessor for it
-      @@theeditor = UVMain.new
-
-      def self.theeditor
-        @@theeditor
-      end
-
       file_loaded(__FILE__)
     end
 
