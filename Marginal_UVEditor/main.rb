@@ -60,12 +60,12 @@ module Marginal
 
       def onSelectionBulkChange(selection)
         p 'onSelectionBulkChange ' + selection.inspect if TraceEvents
-        Marginal::UVEditor::theeditor.newselection(selection)
+        Marginal::UVEditor::theeditor.new_selection(selection)
       end
 
       def onSelectionCleared(selection)
         p 'onSelectionCleared ' + selection.inspect if TraceEvents
-        Marginal::UVEditor::theeditor.clearselection()
+        Marginal::UVEditor::theeditor.clear_selection()
       end
 
     end
@@ -169,13 +169,13 @@ module Marginal
         # Remaining initialization, deferred 'til DOM is ready
         p 'on_load' if TraceEvents
         if Sketchup.active_model.selection.empty?
-          clearselection()
+          clear_selection()
         else
-          newselection(Sketchup.active_model.selection)
+          new_selection(Sketchup.active_model.selection)
         end
       end
 
-      def clearselection
+      def clear_selection
         @model = nil
         @mytransaction = false
         @uvs = []
@@ -184,7 +184,7 @@ module Marginal
         @dialog.execute_script('clear()') if @dialog
       end
 
-      def newselection(selection)
+      def new_selection(selection)
         @model = nil
         @mytransaction = false
         @uvs = []
@@ -200,7 +200,7 @@ module Marginal
 
         # Determine most used material
         selection.each do |ent|
-          if ent.typename == 'Face'	# not interested in anything else, and don't recurse into Components
+          if ent.is_a?(Sketchup::Face)	# not interested in anything else, and don't recurse into Components
             [true,false].each do |front|
               material = front ? ent.material : ent.back_material
               if material and material.texture
@@ -209,7 +209,7 @@ module Marginal
             end
           end
         end
-        return clearselection() if usedmaterials.empty?
+        return clear_selection() if usedmaterials.empty?
         byuse = usedmaterials.invert
         mymaterial = byuse[byuse.keys.sort[-1]]	# most popular material
 
@@ -220,10 +220,10 @@ module Marginal
           newfile = File.join(File.dirname(@model.path), basename)
           if !File.file? newfile
             selection.each do |ent|
-              if ent.typename == 'Face' and ent.material == mymaterial
+              if ent.is_a?(Sketchup::Face) and ent.material == mymaterial
                 raise "Can't write #{newfile}" if @tw.load(ent, true)==0 || @tw.write(ent, true, newfile)!=0
                 break
-              elsif ent.typename == 'Face' and ent.back_material == mymaterial
+              elsif ent.is_a?(Sketchup::Face) and ent.back_material == mymaterial
                 raise "Can't write #{newfile}" if @tw.load(ent, false)==0 || @tw.write(ent, false, newfile)!=0
                 break
               end
@@ -232,7 +232,7 @@ module Marginal
         end
 
         selection.each do |ent|
-          if ent.typename != 'Face'
+          if !ent.is_a?(Sketchup::Face)
             # selection.toggle(ent)	# not interested in anything else
           elsif (!ent.material || !ent.material.texture || ent.material.texture.filename.split(/[\/\\:]+/)[-1]!=basename) && (!ent.back_material || !ent.back_material.texture || ent.back_material.texture.filename.split(/[\/\\:]+/)[-1]!=basename)
             # selection.toggle(ent)	# doesn't use our texture
@@ -244,7 +244,7 @@ module Marginal
               poly = []
               #pos = []	# debug
               ent.outer_loop.vertices.each do |vertex|
-                uv = Point2UV(front ? uvHelp.get_front_UVQ(vertex.position) : uvHelp.get_back_UVQ(vertex.position))
+                uv = point2UV(front ? uvHelp.get_front_UVQ(vertex.position) : uvHelp.get_back_UVQ(vertex.position))
                 idx = uvlookup[uv]
                 if !idx
                   idx = uvlookup[uv] = @uvs.length
@@ -269,7 +269,7 @@ module Marginal
 
       # a model is going away
       def goodbye(model)
-        clearselection() if model==@model	# its our active model
+        clear_selection() if model==@model	# its our active model
         remove_observers(model)
         @known_models.delete(model)
       end
@@ -279,7 +279,7 @@ module Marginal
         p 'on_close ' + @dialog.inspect if TraceEvents
         remove_all_observers()
         @dialog = nil
-        clearselection()
+        clear_selection()
       end
 
       # incoming!
@@ -287,7 +287,7 @@ module Marginal
         p 'on_startupdate' + @dialog.inspect if TraceEvents
         if !@model.valid?	# we didn't notice that our model was closed on Mac
           remove_observers(@model)
-          clearselection()
+          clear_selection()
           return
         end
         @mytransaction = true
@@ -329,7 +329,7 @@ module Marginal
 
       def on_finishupdate
         p 'on_finishupdate' + @dialog.inspect if TraceEvents
-        return clearselection() if !@model.valid?	# we didn't notice that our model was closed on Mac
+        return clear_selection() if !@model.valid?	# we didn't notice that our model was closed on Mac
         @mytransaction = true
         @model.commit_operation
         @mytransaction = false
@@ -343,7 +343,7 @@ module Marginal
       end
         
       # Convert a UV coordinate expressed as a Geom::Point3d to a simple tuple (well, Ruby doesn't do tuple, so actually array).
-      def Point2UV(p)
+      def point2UV(p)
         return [(p.x*Factor/p.z).round * Inverse, (p.y*Factor/p.z).round * Inverse]
       end
 
