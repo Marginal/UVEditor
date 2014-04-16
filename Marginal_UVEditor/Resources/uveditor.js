@@ -559,6 +559,7 @@ function on_mousewheel(e)
 function clear()
 {
     // console.log("clear");
+    if (!container) init();	// for some reason DOMContentLoaded didn't fire
     selection = {};
     uvs = undefined;
     polys = undefined;
@@ -572,6 +573,7 @@ function clear()
 function restart()
 {
     // console.log("restart");
+    if (!container) init();	// for some reason DOMContentLoaded didn't fire
     selection = {};
     saved_uvs = undefined;
     change_mode(modes.SELECT);	// cancel any ongoing operation
