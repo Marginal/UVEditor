@@ -88,12 +88,12 @@ function change_mode(newmode)
         break;
     case modes.ROTATE:
         document.getElementById('tb-rotate').checked = true;
-        document.getElementById('sb-info').innerHTML = "Pick rotation origin and angle. Shift = snap angle.";
+        document.getElementById('sb-info').innerHTML = (!Object.keys(selection).length ? "Use Select tool, or pick one UV to rotate." : "Pick rotation origin and angle. Shift = snap angle.");
         canvas.style.cursor = "url('./cursor_Rotate.png') 11 19, all-scroll";
         break;
     case modes.SCALE:
         document.getElementById('tb-scale').checked = true;
-        document.getElementById('sb-info').innerHTML = "Pick scale origin and size.";
+        document.getElementById('sb-info').innerHTML = (!Object.keys(selection).length ? "Use Select tool, or pick one UV to scale." : "Pick scale origin and size. Shift = toggle uniform");
         canvas.style.cursor = "url('./cursor_Scale.png') 9 9, nesw-resize";
         break;
     default:
@@ -287,7 +287,7 @@ function on_mousemove(e)
     {
         draw_hover_at(cursor);
     }
-    else if (dragstart && (Math.abs(cursor[0]-dragstart[0])>selectfudge || Math.abs(cursor[1]-dragstart[1])>selectfudge))	// active mode
+    else if (dragstart)	// active mode
     {
         uvs = saved_uvs.slice(0);	// restore so don't inference with dragged point at cursor
         var hits = uvs_at(cursor);	// inference
@@ -303,16 +303,14 @@ function on_mousemove(e)
             apply(cursor, e.shiftKey);
             redraw();
         }
-        // rotate to make the dotted line look better. Assumes that this is the last thing we draw
-        var delta = [cursor[0]-dragstart[0], cursor[1]-dragstart[1]];
-        ctx.translate(Math.round(dragstart[0]-0.5)+0.5, Math.round(dragstart[1]-0.5)+0.5);
-        ctx.rotate(Math.atan2(delta[1],delta[0]));
-        draw_dotted_h(ctx, 0, 0, Math.sqrt(delta[0]*delta[0] + delta[1]*delta[1]));
-    }
-    else if (dragstart)	// active mode but too close to origin
-    {
-        uvs = saved_uvs.slice(0);	// restore
-        redraw();
+        if (Math.abs(cursor[0]-dragstart[0])>selectfudge || Math.abs(cursor[1]-dragstart[1])>selectfudge)
+        {
+            // rotate to make the dotted line look better. Assumes that this is the last thing we draw
+            var delta = [cursor[0]-dragstart[0], cursor[1]-dragstart[1]];
+            ctx.translate(Math.round(dragstart[0]-0.5)+0.5, Math.round(dragstart[1]-0.5)+0.5);
+            ctx.rotate(Math.atan2(delta[1],delta[0]));
+            draw_dotted_h(ctx, 0, 0, Math.sqrt(delta[0]*delta[0] + delta[1]*delta[1]));
+        }
     }
     else	// active mode with selection but no origin yet
     {
@@ -455,35 +453,58 @@ function apply(cursor, snap)
         var uv = uvs[idx];
         var uvdelta = [uv[0]-origin[0], uv[1]-origin[1]];
         var uvangle = Math.atan2(uvdelta[1], uvdelta[0]);
-        var uvhypot = Math.sqrt(uvdelta[1]*uvdelta[1], uvdelta[0]*uvdelta[0]);
-        uvs[idx] = uvround([origin[0] + Math.cos(angle+uvangle) * uvdelta[0], origin[1] - Math.sin(angle+uvangle) * uvdelta[1]]);
-        // console.log(origin, uvdelta, uvangle, uvhypot, uvs[idx]);
+        var uvhypot = Math.sqrt(uvdelta[1]*uvdelta[1] + uvdelta[0]*uvdelta[0]);
+        uvs[idx] = uvround([origin[0] + Math.cos(angle+uvangle) * uvhypot, origin[1] + Math.sin(angle+uvangle) * uvhypot]);
+        // console.log(origin, uvdelta, uvangle*180/Math.PI, uvhypot, uvs[idx]);
     }
 
+    function uvs_scale(idx)
+    {
+        var uv = uvs[idx];
+        uvs[idx] = uvround([origin[0]+uvscale[0]*(uv[0]-origin[0]), origin[1]+uvscale[1]*(uv[1]-origin[1])]);
+    }
+
+    var moved = (dragstart && (Math.abs(cursor[0]-dragstart[0])>selectfudge || Math.abs(cursor[1]-dragstart[1])>selectfudge));
+    var origin = canvas2uv(dragstart);
     switch (mode)
     {
     case modes.MOVE:
-        var uvdelta = uvround([(cursor[0]-dragstart[0])/scale/img.naturalWidth,
-                               (dragstart[1]-cursor[1])/scale/img.naturalHeight]);	// canvas origin is top, uv orgin bottom
-        document.getElementById('sb-input').value = snap ?
-            Math.round(uvdelta[0]*img.naturalWidth) + ', ' + Math.round(uvdelta[1]*img.naturalWidth) :
-            (uvdelta[0]*img.naturalWidth).toPrecision(6) + ', ' + (uvdelta[1]*img.naturalWidth).toPrecision(6);
-        Object.keys(selection).forEach(uvs_move);
-        // console.log("move", cursor, dragstart, [cursor[0]-dragstart[0], cursor[1]-dragstart[1]], uvdelta, saved_uvs[Object.keys(selection)[0]], uvs[Object.keys(selection)[0]]);
+        if (moved)
+        {
+            var uvdelta = uvround([(cursor[0]-dragstart[0])/scale/img.naturalWidth,
+                                   (dragstart[1]-cursor[1])/scale/img.naturalHeight]);	// canvas origin is top, uv orgin bottom
+            document.getElementById('sb-input').value = snap ?
+                Math.round(uvdelta[0]*img.naturalWidth) + ', ' + Math.round(uvdelta[1]*img.naturalWidth) :
+                (uvdelta[0]*img.naturalWidth).toPrecision(6) + ', ' + (uvdelta[1]*img.naturalWidth).toPrecision(6);
+            Object.keys(selection).forEach(uvs_move);
+            // console.log("move", cursor, dragstart, [cursor[0]-dragstart[0], cursor[1]-dragstart[1]], uvdelta, saved_uvs[Object.keys(selection)[0]], uvs[Object.keys(selection)[0]]);
+        }
+        else
+            document.getElementById('sb-input').value = "0";
         break;
 
     case modes.ROTATE:
-        if (Math.abs(cursor[0]-dragstart[0])>selectfudge || Math.abs(cursor[1]-dragstart[1])>selectfudge)
+        if (moved)
         {
-            var angle = Math.atan2(cursor[1]-dragstart[1], cursor[0]-dragstart[0]);
-            var origin = canvas2uv(dragstart);
+            var angle = Math.atan2(dragstart[1]-cursor[1], cursor[0]-dragstart[0]);
             if (snap) angle = Math.round(angle * 12/Math.PI) * Math.PI/12;	// round to nearest 15 degrees
             // console.log(angle, angle * 180/Math.PI);
-            document.getElementById('sb-input').value = snap ? Math.round(angle * 180/Math.PI) : (angle * 180/Math.PI).toPrecision(4); // XXX Math.abs(angle)
+            document.getElementById('sb-input').value = snap ? Math.round(Math.abs(angle) * 180/Math.PI) : (Math.abs(angle) * 180/Math.PI).toPrecision(4);
             Object.keys(selection).forEach(uvs_rotate);
         }
         else
             document.getElementById('sb-input').value = "0";
+        break;
+
+    case modes.SCALE:
+        if (moved)
+        {
+            var uvscale = snap ? [Math.round(Math.abs(cursor[0]-dragstart[0])*2)/100, Math.round(Math.abs(cursor[0]-dragstart[0])*2)/100] : [Math.round(Math.abs(cursor[0]-dragstart[0])*2)/100, Math.round(Math.abs(cursor[1]-dragstart[1])*2)/100];
+            document.getElementById('sb-input').value = snap ? uvscale[0].toPrecision(3) : uvscale[0].toPrecision(3) + ', ' + uvscale[1].toPrecision(3);
+            Object.keys(selection).forEach(uvs_scale);
+        }
+        else
+            document.getElementById('sb-input').value = "1";
         break;
     }
     var changed_indices = Object.keys(selection);
@@ -641,7 +662,7 @@ function restart()
     selection = {};
     saved_uvs = undefined;
     change_mode(modes.SELECT);	// cancel any ongoing operation
-    document.getElementById('tb-select').disabled = document.getElementById('tb-move').disabled = false;
+    document.getElementById('tb-select').disabled = document.getElementById('tb-move').disabled = document.getElementById('tb-rotate').disabled = document.getElementById('tb-scale').disabled = false;
 }
 
 
