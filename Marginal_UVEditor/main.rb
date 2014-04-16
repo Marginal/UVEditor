@@ -3,46 +3,27 @@ require 'sketchup.rb'
 module Marginal
   module UVEditor
 
-    # one per model
-    class UVObserver
-
-      @@known_models = {}
-      
-      def self.Hello(model)
-        if !@@known_models.include?(model)
-          @@known_models[model] = Marginal::UVEditor::UVObserver.new(model)
-        end
-      end
-
-      def self.GoodBye(model)
-        return if !@@known_models.include?(model)
-        @@known_models.delete(model)
-        Marginal::UVEditor::theeditor.goodbye(model)
-      end
-
-      def initialize(model)
-        UVModelObserver.new(model)
-        UVSelectionObserver.new(model)
-      end
-
-    end
-
     class UVModelObserver < Sketchup::ModelObserver
 
       def initialize(model)
         model.add_observer(self)
       end
 
+      def remove(model)
+        model.remove_observer(self)
+        self
+      end
+
       def onDeleteModel(model)
         # This doesn't fire on closing the model, so currently worthless. Maybe it will work in the future.
         p "onDeleteModel #{model}" if TraceEvents
-        Marginal::UVEditor::UVObserver::GoodBye(model)
+        Marginal::UVEditor::theeditor.goodbye(model)
       end
 
       def onEraseAll(model)
         # Currently only works on Windows.
         p "onEraseAll #{model}" if TraceEvents
-        Marginal::UVEditor::UVObserver::GoodBye(model)
+        Marginal::UVEditor::theeditor.goodbye(model)
       end
 
       def onTransactionStart(model)
@@ -72,6 +53,11 @@ module Marginal
         model.selection.add_observer(self)
       end
 
+      def remove(model)
+        model.selection.remove_observer(self)
+        self
+      end
+
       def onSelectionBulkChange(selection)
         p 'onSelectionBulkChange ' + selection.inspect if TraceEvents
         Marginal::UVEditor::theeditor.newselection(selection)
@@ -86,9 +72,13 @@ module Marginal
 
 
     # one per app
-    class UVMain
+    class UVMain < Sketchup::AppObserver
  
       def initialize
+        @known_models = {}
+        @model_observers = {}
+        @selection_observers = {}
+
         @dialog = nil
         @tw = Sketchup.create_texture_writer
 
@@ -98,6 +88,57 @@ module Marginal
         @uvs = []		# [[u,v]]
         @facelookup = []	# uv index -> [originating Entity, side]
         @idxlookup = {}		# [Entity,side] -> [uv index]
+
+        Sketchup.add_observer(self)
+        # on[Open|New]Model not sent for initial model - http://www.sketchup.com/intl/en/developer/docs/ourdoc/appobserver#onOpenModel
+        onOpenModel(Sketchup.active_model)
+      end
+
+      def onNewModel(model)
+        p 'onNewModel ' + model.inspect if TraceEvents
+        if !@known_models.include?(model)
+          @known_models[model] = true
+          install_observers(model) if @dialog
+        end
+      end
+
+      def onOpenModel(model)
+        # onOpenModel can be called multiple times if the user re-opens the model from Explorer/Finder
+        p 'onOpenModel ' + model.inspect if TraceEvents
+        if !@known_models.include?(model)
+          @known_models[model] = true
+          install_observers(model) if @dialog
+        end
+      end
+
+      def install_observers(model)
+        if !model.valid?
+          @known_models.delete(model)
+          @model_observers.delete(model)
+          @selection_observers.delete(model)
+        else
+          @model_observers[model] = UVModelObserver.new(model)
+          @selection_observers[model] = UVSelectionObserver.new(model)
+        end
+      end
+
+      def install_all_observers
+        @known_models.keys.each { |model| install_observers(model) }
+      end
+
+      def remove_observers(model)
+        if !model.valid?
+          @known_models.delete(model)
+          @model_observers.delete(model)
+          @selection_observers.delete(model)
+        else
+          @model_observers.delete(model).remove(model)
+          @selection_observers.delete(model).remove(model)
+        end
+      end
+
+      def remove_all_observers
+        @known_models.keys.each { |model| remove_observers(model) }
       end
 
       def launch()
@@ -117,6 +158,7 @@ module Marginal
           @dialog.add_action_callback("on_finishupdate") { |d,p| on_finishupdate() }
           @dialog.add_action_callback("on_cancelupdate") { |d,p| on_cancelupdate() }
           @dialog.set_on_close { on_close() }
+          install_all_observers()
         end
         # https://github.com/thomthom/sketchup-webdialogs-the-lost-manual/wiki/WebDialog.show-vs-WebDialog.show_modal
         RUBY_PLATFORM =~ /darwin/i ? @dialog.show_modal : @dialog.show
@@ -227,11 +269,14 @@ module Marginal
       # a model is going away
       def goodbye(model)
         clearselection() if model==@model	# its our active model
+        remove_observers(model)
+        @known_models.delete(model)
       end
 
       # dialog about to be closed
       def on_close
         p 'on_close ' + @dialog.inspect if TraceEvents
+        remove_all_observers()
         @dialog = nil
         clearselection()
       end
@@ -239,7 +284,11 @@ module Marginal
       # incoming!
       def on_startupdate
         p 'on_startupdate' + @dialog.inspect if TraceEvents
-        return clearselection() if !@model.valid?	# we didn't notice that our model was closed on Mac
+        if !@model.valid?	# we didn't notice that our model was closed on Mac
+          remove_observers(@model)
+          clearselection()
+          return
+        end
         @mytransaction = true
         @model.start_operation('Position Texture', false)
         @mytransaction = false
@@ -248,7 +297,6 @@ module Marginal
       # incoming!
       def on_update
         p 'on_update' + @dialog.inspect if TraceEvents
-        return clearselection() if !@model.valid?	# we didn't notice that our model was closed on Mac
         @mytransaction = true
         update_uvs = eval(@dialog.get_element_value('update_uvs'))
         selection = {}	# selected faces
@@ -316,29 +364,6 @@ module Marginal
         @@theeditor
       end
 
-      # one per app
-      class UVAppObserver < Sketchup::AppObserver
-
-        def initialize
-          Sketchup.add_observer(self)
-        end
-
-        def onNewModel(model)
-          p 'onNewModel ' + model.inspect if TraceEvents
-          Marginal::UVEditor::UVObserver::Hello(model)
-        end
-
-        def onOpenModel(model)
-          # onOpenModel can be called multiple times if the user re-opens the model from Explorer/Finder
-          p 'onOpenModel ' + model.inspect if TraceEvents
-          Marginal::UVEditor::UVObserver::Hello(model)
-        end
-
-      end
-
-      # on[Open|New]Model not sent for initial model - http://www.sketchup.com/intl/en/developer/docs/ourdoc/appobserver#onOpenModel
-      UVAppObserver.new.onOpenModel(Sketchup.active_model)
-      
       file_loaded(__FILE__)
     end
 
