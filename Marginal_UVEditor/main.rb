@@ -263,7 +263,8 @@ module Marginal
           end
         end
 
-        @dialog.execute_script("document.getElementById('thetexture').src='file:///#{newfile.gsub('\\','/')}'; uvs=#{@uvs.inspect}; polys=#{polys.inspect}; restart()");
+        url = 'file:///' + newfile.gsub('%','%25').gsub(';','%3B').gsub('?','%3F').gsub('\\','/')	# minimal escaping
+        @dialog.execute_script("document.getElementById('thetexture').src='#{url}'; uvs=#{@uvs.inspect}; polys=#{polys.inspect}; restart()");
       end
 
       # a model is going away
