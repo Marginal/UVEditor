@@ -16,6 +16,7 @@ var polys;			// Input from SketchUp - indices into uvs
 
 var selection = {};		// indices into uvs
 var selection_is_temporary;	// selection should be reset after operation
+var selection_centroid;		// uv coordinates of centroid;
 var saved_uvs;
 
 var modes = { SELECT:0, MOVE:1, ROTATE:2, SCALE:3 };
@@ -25,7 +26,7 @@ var zoomcumulative = 0;
 var off_u=0; var off_v=0;	// Texture display offset in pixels (unscaled)
 var dragstart;			// start of operation in canvas units
 
-var point_u; var point_s;	// Unselected, selected, dragstart ImageData
+var point_u; var point_s; var point_c;	// Unselected, selected, centroid ImageData
 
 var selectfudge = 3.5;		// cursor hotspot semi-width
 var mouse_suppress_dupes;
@@ -48,6 +49,7 @@ function init()
     update_selection = document.getElementById("update_selection");
     point_u = make_point(ctx, 3, [0,0,0]);
     point_s = make_point(ctx, 5, [0,0,255]);
+    point_c = make_point(ctx, 3, [0,0,255]);
     window.addEventListener("resize", redraw, false);	// update on resize
     canvas.addEventListener("mousedown", on_mousedown, false);
     canvas.addEventListener('mousemove', on_mousemove, false);
@@ -108,6 +110,13 @@ function change_mode(newmode)
         uvs = saved_uvs;
         saved_uvs = undefined;
     }
+    if (selection_is_temporary)
+    {
+        selection = {};
+        selection_centroid = undefined;
+    }
+    else
+        selection_centroid = centroid_of_selection();
     document.getElementById('sb-input').value = "";
     document.getElementById('sb-input').disabled = true;
     document.getElementById('sb-label').innerHTML = "Measurements";
@@ -176,7 +185,8 @@ function on_mousedown(e)
     }
     else if (!dragstart)
     {
-        if (Object.keys(selection).length)
+        var hits = uvs_at(cursor);
+        if (Object.keys(selection).length)	// have selection - lets go
         {
             document.getElementById('sb-input').disabled = false;
             switch (mode)
@@ -191,35 +201,56 @@ function on_mousedown(e)
                 document.getElementById('sb-label').innerHTML = "Scale";
                 break;
             }
+            if (hits.length)
+                dragstart = uv2canvas(uvs[hits[0]]);	// snap
+            else if (selection_centroid_at(cursor))
+                dragstart = uv2canvas(selection_centroid);
+            else if (e.shiftKey)
+                dragstart = uv2canvas([Math.round(canvas2uv(cursor)[0] * img.naturalWidth) / img.naturalWidth,
+                                       Math.round(canvas2uv(cursor)[1] *img.naturalHeight) / img.naturalHeight]);
+            else
+                dragstart = cursor;
             saved_uvs = uvs;
-            dragstart = cursor;
+            selection_centroid = undefined;
             mouse_suppress_dupes = cursor;	// suppress mouse movement after mouse down
             // console.log('start');
             window.location="skp:on_startupdate";
             redraw();
         }
-        else		// can move points without prior selection
+        else if (hits.length)			// make temporary selection
         {
-            var hits = uvs_at(cursor);
-            if (hits.length)
+            for (var i=0; i<hits.length; i++)
+                selection[hits[i]] = true;	// latch selection
+            selection_is_temporary = true;
+            selection_centroid = centroid_of_selection();
+            mouse_suppress_dupes = cursor;	// suppress mouse movement after mouse down
+
+            switch (mode)
             {
-                for (var i=0; i<hits.length; i++)
-                    selection[hits[i]] = true;	// latch selection
-                selection_is_temporary = true;
-                document.getElementById('sb-info').innerHTML = "Pick point to move. Shift = snap to pixels.";
+            case modes.MOVE:		// can move points without prior selection
+                document.getElementById('sb-info').innerHTML = "Pick destination point. Shift = snap to pixels.";
                 document.getElementById('sb-input').disabled = false;
                 document.getElementById('sb-label').innerHTML = "Pixels";
+                selection_centroid = undefined;
                 saved_uvs = uvs;
                 dragstart = uv2canvas(uvs[hits[0]]);
                 // snap to selection average - doesn't work because mouse up detects the offset as a move
                 // var coords = Object.keys(selection).map(function(idx) { return uvs[idx]; });
                 // var uv = coords.reduce(function(a,b) { return [a[0]+b[0], a[1]+b[1]]; });
                 // dragstart = uv2canvas([uv[0] / coords.length, uv[1] / coords.length]); 
-                mouse_suppress_dupes = cursor;	// suppress mouse movement after mouse down
                 // console.log('start', dragstart);
                 window.location="skp:on_startupdate";
-                redraw();
+                break;
+            case modes.ROTATE:
+                document.getElementById('sb-info').innerHTML = "Pick rotation origin and angle. Shift = snap angle.";
+                break;
+            case modes.SCALE:
+                document.getElementById('sb-info').innerHTML = "Pick scale origin and size.";
+                break;
+            default:
+                change_mode(modes.SELECT);	// eh?
             }
+            redraw();
         }
     }
 }
@@ -237,6 +268,8 @@ function on_mousemove(e)
         if (dragstart)
         {
             selection = uvs_within(dragstart, cursor);
+            selection_is_temporary = false;
+            selection_centroid = centroid_of_selection();
             redraw();
             // move origin to make the dotted line look better. Assumes that this is the last thing we draw
             ctx.translate(Math.round(dragstart[0]-0.5)+0.5, Math.round(dragstart[1]-0.5)+0.5);
@@ -323,6 +356,7 @@ function on_mouseup(e)
         }
         dragstart = undefined;
         selection_is_temporary = false;
+        selection_centroid = centroid_of_selection();
     }
     else if (mouse_suppress_dupes && mouse_suppress_dupes[0]==cursor[0] && mouse_suppress_dupes[1]==cursor[1])
         return;
@@ -351,7 +385,13 @@ function on_mouseup(e)
         document.getElementById('sb-label').innerHTML = "Measurements";
         dragstart = undefined;
         saved_uvs = undefined;
-        if (selection_is_temporary) selection = {};
+        if (selection_is_temporary)
+        {
+            selection = {};
+            selection_centroid = undefined;
+        }
+        else
+            selection_centroid = centroid_of_selection();
     }
     // preserve dragstart if clicked to start active mode
 
@@ -515,6 +555,30 @@ function uvs_within(pta, ptb)
 }
 
 
+function centroid_of_selection()
+{
+    var coords = Object.keys(selection).map(function(idx) { return uvs[idx]; });
+    switch (coords.length)
+    {
+    case 0:
+        return undefined;
+    case 1:
+        return coords[0];
+    default:
+        var cuv = coords.reduce(function(a,b) { return [a[0]+b[0], a[1]+b[1]]; });
+        return uvround([cuv[0] / coords.length, cuv[1] / coords.length]);
+    }
+}
+
+function selection_centroid_at(cursor)
+{
+    if (!selection_centroid) return undefined;
+    var uvc = uv2canvas(selection_centroid);
+    console.log(cursor + uv2canvas(selection_centroid) + (Math.abs(cursor[0]-uvc[0])<=selectfudge && Math.abs(cursor[1]-uvc[1])<=selectfudge));
+    return (Math.abs(cursor[0]-uvc[0])<=selectfudge && Math.abs(cursor[1]-uvc[1])<=selectfudge) ? selection_centroid : undefined;
+}
+
+
 function on_mousewheel(e)
 {
     e.stopPropagation();
@@ -648,6 +712,8 @@ function redraw()
     ctx.shadowColor = "transparent";
     for (var i=0; i<uvs.length; i++)
         draw_point(uv2canvas(uvs[i]), selection[i] ? point_s : point_u);
+    if (selection_centroid)
+        draw_point(uv2canvas(selection_centroid), point_c);
 }
 
 
@@ -668,7 +734,8 @@ function draw_inference_at(cursor)
     var hits = uvs_at(cursor);
     if (hits.length)
         draw_inference(uv2canvas(uvs[hits[0]]));
-    return hits;
+    else if (selection_centroid_at(cursor))
+        draw_inference(uv2canvas(selection_centroid));
 }
 
 
