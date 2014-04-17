@@ -1,4 +1,5 @@
 require 'sketchup.rb'
+require File.join(File.dirname(__FILE__), 'utils.rb')
 
 module Marginal
   module UVEditor
@@ -26,9 +27,9 @@ module Marginal
         Marginal::UVEditor::theeditor.goodbye(model)
       end
 
-      def onTransactionStart(model)
-        p "onTransactionStart #{model}" if TraceEvents
-      end
+      # def onTransactionStart(model)
+      #   p "onTransactionStart #{model}" if TraceEvents
+      # end
 
       def onTransactionCommit(model)
         p "onTransactionCommit #{model}" if TraceEvents
@@ -84,7 +85,6 @@ module Marginal
 
         # currently active stuff
         @model = nil
-        @mytransaction = false	# 
         @uvs = []		# [[u,v]]
         @facelookup = []	# uv index -> [originating Entity, side]
         @idxlookup = {}		# [Entity,side] -> [uv index]
@@ -98,7 +98,7 @@ module Marginal
         p 'onNewModel ' + model.inspect if TraceEvents
         if !@known_models.include?(model)
           @known_models[model] = true
-          install_observers(model) if @dialog
+          install_observers(model)
         end
       end
 
@@ -107,16 +107,16 @@ module Marginal
         p 'onOpenModel ' + model.inspect if TraceEvents
         if !@known_models.include?(model)
           @known_models[model] = true
-          install_observers(model) if @dialog
+          install_observers(model)
         end
       end
 
       def install_observers(model)
-        if !model.valid?
+        if !model || !model.valid?
           @known_models.delete(model)
           @model_observers.delete(model)
           @selection_observers.delete(model)
-        else
+        elsif @dialog && !@model_observers[model]
           @model_observers[model] = UVModelObserver.new(model)
           @selection_observers[model] = UVSelectionObserver.new(model)
         end
@@ -127,13 +127,15 @@ module Marginal
       end
 
       def remove_observers(model)
-        if !model.valid?
+        if !model || !model.valid?
           @known_models.delete(model)
           @model_observers.delete(model)
           @selection_observers.delete(model)
         else
-          @model_observers.delete(model).remove(model)
-          @selection_observers.delete(model).remove(model)
+          o = @model_observers.delete(model)
+          o.remove(model) if o
+          o = @selection_observers.delete(model)
+          o.remove(model) if o
         end
       end
 
@@ -178,7 +180,6 @@ module Marginal
 
       def clear_selection
         @model = nil
-        @mytransaction = false
         @uvs = []
         @facelookup = []
         @idxlookup = {}
@@ -187,7 +188,6 @@ module Marginal
 
       def new_selection(selection)
         @model = nil
-        @mytransaction = false
         @uvs = []
         @facelookup = []
         @idxlookup = {}
@@ -195,24 +195,11 @@ module Marginal
 
         @model = selection.model
         facedata = {}
-        usedmaterials = Hash.new(0)
         uvlookup = {}
         polys = []
 
-        # Determine most used material
-        selection.each do |ent|
-          if ent.is_a?(Sketchup::Face)	# not interested in anything else, and don't recurse into Components
-            [true,false].each do |front|
-              material = front ? ent.material : ent.back_material
-              if material and material.texture
-                usedmaterials[material] += ent.outer_loop.vertices.length + (front ? 1 : 0)	# weight towards front
-              end
-            end
-          end
-        end
-        return clear_selection() if usedmaterials.empty?
-        byuse = usedmaterials.invert
-        mymaterial = byuse[byuse.keys.sort[-1]]	# most popular material
+        mymaterial = Marginal::UVEditor.material_from_selection(selection)
+        return clear_selection() if !mymaterial
 
         # Ensure material's texture is available in the file system
         newfile = mymaterial.texture.filename
@@ -245,7 +232,7 @@ module Marginal
               poly = []
               #pos = []	# debug
               ent.outer_loop.vertices.each do |vertex|
-                uv = point2UV(front ? uvHelp.get_front_UVQ(vertex.position) : uvHelp.get_back_UVQ(vertex.position))
+                uv = Marginal::UVEditor.point2UV(front ? uvHelp.get_front_UVQ(vertex.position) : uvHelp.get_back_UVQ(vertex.position))
                 idx = uvlookup[uv]
                 if !idx
                   idx = uvlookup[uv] = @uvs.length
@@ -286,20 +273,16 @@ module Marginal
       # incoming!
       def on_startupdate
         p 'on_startupdate' + @dialog.inspect if TraceEvents
+        remove_observers(@model)
         if !@model.valid?	# we didn't notice that our model was closed on Mac
-          remove_observers(@model)
-          clear_selection()
-          return
+          return clear_selection()
         end
-        @mytransaction = true
         @model.start_operation('Position Texture', false)
-        @mytransaction = false
       end
 
       # incoming!
       def on_update
         p 'on_update' + @dialog.inspect if TraceEvents
-        @mytransaction = true
         update_uvs = eval(@dialog.get_element_value('update_uvs'))
         selection = {}	# selected faces
         eval(@dialog.get_element_value('update_selection')).each_with_index do |idx,i|
@@ -315,25 +298,25 @@ module Marginal
             uv = @uvs[indices[i]]
             pos << Geom::Point3d.new(uv[0],uv[1],1)
           end
-          ent.position_material(front ? ent.material : ent.back_material, pos, front)
+          begin
+            ent.position_material(front ? ent.material : ent.back_material, pos, front)
+            # silently ignore failure to project
+          end
           #p "new: #{pos.inspect} #{front}"
         end
-        @mytransaction = false
       end
 
       def on_cancelupdate
         p 'on_cancelupdate' + @dialog.inspect if TraceEvents
-        @mytransaction = true
         @model.abort_operation if @model and @model.valid?
-        @mytransaction = false
+        install_observers(@model)
       end
 
       def on_finishupdate
         p 'on_finishupdate' + @dialog.inspect if TraceEvents
         return clear_selection() if !@model.valid?	# we didn't notice that our model was closed on Mac
-        @mytransaction = true
         @model.commit_operation
-        @mytransaction = false
+        install_observers(@model)
       end
 
       def on_export
@@ -346,26 +329,16 @@ module Marginal
 
       # something changed in a model
       def transaction
-        if @model and @model.valid? and !@mytransaction	# its our model and it wasn't caused by us
+        if @model and @model.valid?	# its our model
           on_load()
         end
       end
         
-      # Convert a UV coordinate expressed as a Geom::Point3d to a simple tuple (well, Ruby doesn't do tuple, so actually array).
-      def point2UV(p)
-        return [(p.x*Factor/p.z).round * Inverse, (p.y*Factor/p.z).round * Inverse]
-      end
-
     end
 
 
     # one-time initialisation
     if !file_loaded?(__FILE__)
-
-      # Rounding for UV values
-      Round = 8
-      Factor = 10.0 ** Round
-      Inverse = 1/Factor
 
       # create a single instance and accessor for it
       @@theeditor = UVMain.new
