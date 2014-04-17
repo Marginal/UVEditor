@@ -22,14 +22,17 @@
     #container { position:absolute; top:40px; bottom:29px; left:0px; right:0px; overflow: hidden; }
     .imgresource { display:none; }
     [unselectable] { -webkit-user-select:none; -ms-user-select:none; user-select:none; }
-    .tb-button { display:inline-block; }
-    .tb-button input { display:none; margin:0; padding:0; }
-    .tb-button label { display:block; height:32px; border-style:solid; border-width:1px; border-radius:3px; border-color:ButtonFace; }
-    .tb-button input:checked + label { border-color:WindowFrame; }
-    .tb-button input:checked + label:hover { border-color:WindowFrame; }
-    .tb-button input:enabled + label:hover { background:ButtonHighlight; border-color:ButtonShadow; }
-    .tb-button input:checked + label img { box-shadow: 4px 4px 16px ButtonShadow inset; }
-    .tb-button input:disabled + label img { opacity:0.33; filter:alpha(opacity=33); }
+    .tb-radio { display:inline-block; }
+    .tb-radio input { display:none; margin:0; padding:0; }
+    .tb-radio label { display:block; height:32px; border-style:solid; border-width:1px; border-radius:3px; border-color:ButtonFace; }
+    .tb-radio input:checked + label { border-color:WindowFrame; }
+    .tb-radio input:checked + label:hover { border-color:WindowFrame; }
+    .tb-radio input:enabled + label:hover { background:ButtonHighlight; border-color:ButtonShadow; }
+    .tb-radio input:checked + label img { box-shadow: 4px 4px 16px ButtonShadow inset; }
+    .tb-radio input:disabled + label img { opacity:0.33; filter:alpha(opacity=33); }
+    .tb-button { display:inline-block; height:34px; border-style:solid; border-width:1px; border-radius:3px; margin:0; padding:0; border-color:ButtonFace; }
+    .tb-button:enabled:hover { background:ButtonHighlight; border-color:ButtonShadow; }
+    .tb-button:disabled img { opacity:0.33; filter:alpha(opacity=33); }
     .vr { display:inline-block; width:1px; height:32px; background-color:ButtonShadow; }
     .sb-button { float:left; padding: 1px; margin:1px; margin-left:3px; margin-right:3px; background:Menu; border-style:solid; border-width:1px; border-radius:3px; border-color:Menu; }
     .sb-button:disabled { opacity:0.33; filter:alpha(opacity=33); }
@@ -56,23 +59,25 @@
 
   <form class="toolbar">
     <!-- http://jeremyworboys.com/writing/toggle-buttons-without-javascript -->
-    <div class="tb-button">
+    <div class="tb-radio" title="Select">
         <input type="radio" name="tb" id="tb-select" onchange="change_mode(modes.SELECT)" checked disabled>
         <label for="tb-select" unselectable><img src="./tb_select.png"></label>
     </div>
     <div class="vr"></div>
-    <div class="tb-button">
+    <div class="tb-radio" title="Move">
         <input type="radio" name="tb" id="tb-move" onchange="change_mode(modes.MOVE)" disabled>
         <label for="tb-move" unselectable><img src="./tb_move.png"></label>
     </div>
-    <div class="tb-button">
+    <div class="tb-radio" title="Rotate">
         <input type="radio" name="tb" id="tb-rotate" onchange="change_mode(modes.ROTATE)" disabled>
         <label for="tb-rotate" unselectable><img src="./tb_rotate.png"></label>
     </div>
-    <div class="tb-button">
+    <div class="tb-radio" title="Scale">
         <input type="radio" name="tb" id="tb-scale" onchange="change_mode(modes.SCALE)" disabled>
         <label for="tb-scale" unselectable><img src="./tb_scale.png"></label>
     </div>
+    <div class="vr"></div>
+    <button class="tb-button" type="button" id="tb-save" onclick="export_layout()" title="Export UV layout" disabled><img src="./tb_save.png"></button>
   </form>  
 
   <img id="thetexture" class="imgresource" onload="redraw()">
@@ -83,6 +88,7 @@
 
   <input id="update_uvs" type="hidden">
   <input id="update_selection" type="hidden">
+  <input id="export_data" type="hidden">
 
   <div class="push"></div>
   </div>

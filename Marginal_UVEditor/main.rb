@@ -157,6 +157,7 @@ module Marginal
           @dialog.add_action_callback("on_update")       { |d,p| on_update() }
           @dialog.add_action_callback("on_finishupdate") { |d,p| on_finishupdate() }
           @dialog.add_action_callback("on_cancelupdate") { |d,p| on_cancelupdate() }
+          @dialog.add_action_callback("on_export")       { |d,p| on_export() }
           @dialog.set_on_close { on_close() }
           install_all_observers()
         end
@@ -333,6 +334,14 @@ module Marginal
         @mytransaction = true
         @model.commit_operation
         @mytransaction = false
+      end
+
+      def on_export
+        p 'on_export' if TraceEvents
+        filename = UI::savepanel("Export UV layout", File.dirname(@model.path), "UV_layout.png")
+        if filename
+          File.open(filename, 'wb') {|f| f.write(@dialog.get_element_value('export_data').unpack('m')[0]) }
+        end
       end
 
       # something changed in a model

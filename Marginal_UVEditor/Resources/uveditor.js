@@ -1,6 +1,6 @@
 /* UV Editor */
 
-/* exported init, clear, restart */
+/* exported init, clear, restart, export_layout */
 
 //XXX "use strict";
 
@@ -11,8 +11,13 @@ var img;
 var update_uvs;
 var update_selection;
 
-var uvs;			// Input from SketchUp
-var polys;			// Input from SketchUp - indices into uvs
+// for exporting
+var ecanvas;
+var ectx;
+
+// input from SketchUp
+var uvs;
+var polys;			// indices into uvs
 
 var selection = {};		// indices into uvs
 var selection_is_temporary;	// selection should be reset after operation
@@ -650,7 +655,7 @@ function clear()
     polys = undefined;
     saved_uvs = undefined;
     change_mode(modes.SELECT);	// cancel any ongoing operation
-    document.getElementById('tb-select').disabled = document.getElementById('tb-move').disabled = document.getElementById('tb-rotate').disabled = document.getElementById('tb-scale').disabled = true;
+    document.getElementById('tb-select').disabled = document.getElementById('tb-move').disabled = document.getElementById('tb-rotate').disabled = document.getElementById('tb-scale').disabled = document.getElementById('tb-save').disabled = true;
 }
 
 
@@ -662,7 +667,7 @@ function restart()
     selection = {};
     saved_uvs = undefined;
     change_mode(modes.SELECT);	// cancel any ongoing operation
-    document.getElementById('tb-select').disabled = document.getElementById('tb-move').disabled = document.getElementById('tb-rotate').disabled = document.getElementById('tb-scale').disabled = false;
+    document.getElementById('tb-select').disabled = document.getElementById('tb-move').disabled = document.getElementById('tb-rotate').disabled = document.getElementById('tb-scale').disabled = document.getElementById('tb-save').disabled = false;
 }
 
 
@@ -818,4 +823,60 @@ function canvas2uv(coord)
 function uvround(uv)
 {
     return [Math.round(uv[0]*uvFactor) * uvInverse, Math.round(uv[1]*uvFactor) * uvInverse];
+}
+
+function export_layout()
+{
+    function uv2ecanvas(uv)
+    {
+        return [uv[0]*img.naturalWidth, img.naturalHeight - uv[1]*img.naturalHeight];
+    }
+
+    function poly_stroke(poly)
+    {
+        ectx.beginPath();
+        var uv = uv2ecanvas(uvs[poly[0]]);
+        ectx.moveTo(uv[0], uv[1]);
+        for (var i=1; i<poly.length; i++)
+        {
+            uv = uv2ecanvas(uvs[poly[i]]);
+            ectx.lineTo(uv[0], uv[1]);
+        }
+        ectx.closePath();
+        ectx.stroke();
+    }
+
+    function poly_fill(poly)
+    {
+        ectx.beginPath();
+        var uv = uv2ecanvas(uvs[poly[0]]);
+        ectx.moveTo(uv[0], uv[1]);
+        for (var i=1; i<poly.length; i++)
+        {
+            uv = uv2ecanvas(uvs[poly[i]]);
+            ectx.lineTo(uv[0], uv[1]);
+        }
+        ectx.closePath();
+        ectx.fill();
+    }
+
+    if (!ecanvas)
+    {
+        ecanvas = document.createElement('canvas');
+        ectx = ecanvas.getContext('2d');
+    }
+    ecanvas.width = img.naturalWidth;
+    ecanvas.height = img.naturalHeight;
+    ectx.lineWidth = 1;
+    ectx.lineCap = 'square';
+    ectx.strokeStyle = "Black";
+    ectx.fillStyle = "rgba(127, 127, 127, 0.5)";
+    polys.forEach(poly_fill);
+    polys.forEach(poly_stroke);	// stroke in separate pass so on top
+
+    // if (ecanvas.msToBlob && navigator.msSaveBlob)
+    //     return navigator.msSaveBlob(ecanvas.msToBlob(), 'UV_layout.png');        // IE10+
+
+    document.getElementById("export_data").value = ecanvas.toDataURL("image/png").split(',')[1];
+    window.location="skp:on_export";
 }
