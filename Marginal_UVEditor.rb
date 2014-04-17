@@ -18,7 +18,7 @@ require 'extensions.rb'
 module Marginal
   module UVEditor
 
-    Version = "0.20"
+    Version = "0.30"
 
     # Debug
     TraceEvents = false
