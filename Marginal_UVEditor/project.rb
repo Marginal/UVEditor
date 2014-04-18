@@ -14,7 +14,7 @@ module Marginal
 
       mymaterial = material_from_selection(selection)
       return if !mymaterial
-      basename = mymaterial.texture.filename.split(/[\/\\:]+/)[-1]	# basename which handles \ on Mac
+      basename = mymaterial.texture.filename[/[^\/\\]+$/]	# basename which handles \ on Mac
 
       @@theeditor.remove_observers(model)
       model.start_operation('Project Texture', true)
@@ -23,12 +23,12 @@ module Marginal
         selection.each do |ent|
           if !ent.is_a?(Sketchup::Face)
             selection.toggle(ent)	# not interested in anything else
-          elsif (!ent.material || !ent.material.texture || ent.material.texture.filename.split(/[\/\\:]+/)[-1]!=basename) && (!ent.back_material || !ent.back_material.texture || ent.back_material.texture.filename.split(/[\/\\:]+/)[-1]!=basename)
+          elsif (!ent.material || !ent.material.texture || ent.material.texture.filename[/[^\/\\]+$/]!=basename) && (!ent.back_material || !ent.back_material.texture || ent.back_material.texture.filename[/[^\/\\]+$/]!=basename)
             selection.toggle(ent)	# doesn't use our texture
           else
             [true,false].each do |front|
               material = front ? ent.material : ent.back_material
-              next if not material or not material.texture or material.texture.filename.split(/[\/\\:]+/)[-1]!=basename
+              next if not material or not material.texture or material.texture.filename[/[^\/\\]+$/]!=basename
               pos = []
               v = ent.outer_loop.vertices[0..3]	# can only set up to 4 vertices
               v.each do |vertex|

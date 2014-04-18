@@ -203,7 +203,7 @@ module Marginal
 
         # Ensure material's texture is available in the file system
         newfile = mymaterial.texture.filename
-        basename = mymaterial.texture.filename.split(/[\/\\:]+/)[-1]	# basename which handles \ on Mac
+        basename = mymaterial.texture.filename[/[^\/\\]+$/]	# basename which handles \ on Mac
         if !File.file?(newfile) || newfile==basename	# doesn't exist or unqualified
           newfile = File.join(File.dirname(@model.path), basename)
           if !File.file? newfile
@@ -222,13 +222,13 @@ module Marginal
         selection.each do |ent|
           if !ent.is_a?(Sketchup::Face)
             # selection.toggle(ent)	# not interested in anything else
-          elsif (!ent.material || !ent.material.texture || ent.material.texture.filename.split(/[\/\\:]+/)[-1]!=basename) && (!ent.back_material || !ent.back_material.texture || ent.back_material.texture.filename.split(/[\/\\:]+/)[-1]!=basename)
+          elsif (!ent.material || !ent.material.texture || ent.material.texture.filename[/[^\/\\]+$/]!=basename) && (!ent.back_material || !ent.back_material.texture || ent.back_material.texture.filename[/[^\/\\]+$/]!=basename)
             # selection.toggle(ent)	# doesn't use our texture
           else
             uvHelp = ent.get_UVHelper(true, true, @tw)
             [true,false].each do |front|
               material = front ? ent.material : ent.back_material
-              next if not material or not material.texture or material.texture.filename.split(/[\/\\:]+/)[-1]!=basename
+              next if not material or not material.texture or material.texture.filename[/[^\/\\]+$/]!=basename
               poly = []
               #pos = []	# debug
               ent.outer_loop.vertices.each do |vertex|
