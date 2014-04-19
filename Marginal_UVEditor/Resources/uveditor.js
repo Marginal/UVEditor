@@ -1,6 +1,6 @@
 /* UV Editor */
 
-/* exported init, clear, restart, export_layout */
+/* exported init, clear, restart, export_layout, help */
 
 //XXX "use strict";
 
@@ -879,4 +879,10 @@ function export_layout()
 
     document.getElementById("export_data").value = ecanvas.toDataURL("image/png").split(',')[1];
     window.location="skp:on_export";
+}
+
+
+function help()
+{
+    window.location="skp:on_help";
 }

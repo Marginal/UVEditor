@@ -160,6 +160,7 @@ module Marginal
           @dialog.add_action_callback("on_finishupdate") { |d,p| on_finishupdate() }
           @dialog.add_action_callback("on_cancelupdate") { |d,p| on_cancelupdate() }
           @dialog.add_action_callback("on_export")       { |d,p| on_export() }
+          @dialog.add_action_callback("on_help")         { |d,p| on_help() }
           @dialog.set_on_close { on_close() }
           install_all_observers()
         end
@@ -328,6 +329,13 @@ module Marginal
         install_observers(@model)
       end
 
+      # something changed in a model
+      def transaction
+        if @model and @model.valid?	# its our model
+          on_load()
+        end
+      end
+
       def on_export
         p 'on_export' if TraceEvents
         filename = UI::savepanel("Export UV layout", File.dirname(@model.path), "UV_layout.png")
@@ -336,11 +344,9 @@ module Marginal
         end
       end
 
-      # something changed in a model
-      def transaction
-        if @model and @model.valid?	# its our model
-          on_load()
-        end
+      def on_help
+        p 'on_help' if TraceEvents
+        Marginal::UVEditor::help
       end
         
     end

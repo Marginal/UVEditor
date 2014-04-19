@@ -1,6 +1,7 @@
 require 'sketchup.rb'
 require File.join(File.dirname(__FILE__), 'main.rb')
 require File.join(File.dirname(__FILE__), 'project.rb')
+require File.join(File.dirname(__FILE__), 'L10n.rb')
 
 module Marginal
   module UVEditor
@@ -29,7 +30,17 @@ module Marginal
         UI.start_timer(0.2, false) { tb.restore }	# http://sketchucation.com/forums/viewtopic.php?p=269734#p269734
       end
 
+      UI.menu("Help").add_item("UV Editor") { help }
+
       file_loaded(__FILE__)
+    end
+
+    @@help_dialog = UI::WebDialog.new('UV Editor Help', true, 'UVEditor_help', 768, 768)
+    @@help_dialog.set_file('file:///' + L10N.resource_file('UVEditor.html'))
+
+    def self.help
+      RUBY_PLATFORM =~ /darwin/i ? @@help_dialog.show_modal : @@help_dialog.show;
+      @@help_dialog.bring_to_front
     end
 
   end

@@ -16,7 +16,7 @@ install:	$(TARGET)
 	rm -rf $(INSTALLDIR)/$(PROJECT)
 	unzip -o -d $(INSTALLDIR) $(TARGET)
 
-$(PROJECT)_v$(VER).rbz:	$(PROJECT).rb $(PROJECT)/*.rb $(PROJECT)/Resources/*.html $(PROJECT)/Resources/*.js $(PROJECT)/Resources/*.png
-# $(PROJECT)/Resources/*.css $(PROJECT)/Resources/??/*.html $(PROJECT)/Resources/??/*.strings
+$(PROJECT)_v$(VER).rbz:	$(PROJECT).rb $(PROJECT)/*.rb $(PROJECT)/Resources/*.html $(PROJECT)/Resources/*.js $(PROJECT)/Resources/*.png $(PROJECT)/Resources/??/*.html
+# $(PROJECT)/Resources/??/*.strings
 	rm -f $@
 	zip -MM $@ $+
