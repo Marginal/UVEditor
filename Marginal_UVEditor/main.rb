@@ -231,8 +231,11 @@ module Marginal
               next if not material or not material.texture or material.texture.filename[/[^\/\\]+$/]!=basename
               poly = []
               #pos = []	# debug
-              ent.outer_loop.vertices.each do |vertex|
-                uv = Marginal::UVEditor.point2UV(front ? uvHelp.get_front_UVQ(vertex.position) : uvHelp.get_back_UVQ(vertex.position))
+              v = ent.outer_loop.vertices
+              v.each_index do |i|
+                pt = v[i].position
+                next if pt.on_line?([v[i-1], v[(i+1)%v.length]])	# skip colinear points - can't do anything useful with them
+                uv = Marginal::UVEditor.point2UV(front ? uvHelp.get_front_UVQ(pt) : uvHelp.get_back_UVQ(pt))
                 idx = uvlookup[uv]
                 if !idx
                   idx = uvlookup[uv] = @uvs.length
@@ -291,16 +294,22 @@ module Marginal
         end
         selection.keys.each do | ent,front |
           pos = []
-          v = ent.outer_loop.vertices[0..3]	# can only set up to 4 vertices
           indices = @idxlookup[[ent,front]]	# [Entity,side] -> [uv index]
+          v = ent.outer_loop.vertices
+          j = 0
           v.each_index do |i|
-            pos << v[i]
-            uv = @uvs[indices[i]]
+            pt = v[i].position
+            next if pt.on_line?([v[i-1], v[(i+1)%v.length]])	# skip colinear points - can't do anything useful with them
+            pos << pt
+            uv = @uvs[indices[j]]
             pos << Geom::Point3d.new(uv[0],uv[1],1)
+            j+=1
           end
           begin
-            ent.position_material(front ? ent.material : ent.back_material, pos, front)
+            ent.position_material(front ? ent.material : ent.back_material, pos[0..7], front)
+          rescue => e
             # silently ignore failure to project
+            puts "Error: #{e.inspect} #{pos[0..7].inspect}", e.backtrace	# Report to console
           end
           #p "new: #{pos.inspect} #{front}"
         end

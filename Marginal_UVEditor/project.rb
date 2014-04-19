@@ -30,15 +30,25 @@ module Marginal
               material = front ? ent.material : ent.back_material
               next if not material or not material.texture or material.texture.filename[/[^\/\\]+$/]!=basename
               pos = []
-              v = ent.outer_loop.vertices[0..3]	# can only set up to 4 vertices
-              v.each do |vertex|
-                pos << vertex
-                pt = view.screen_coords(vertex)
-                # p vertex, pt, [(pt.x-tl[0]) / (br[0]-tl[0]), 1 - (pt.y-tl[1]) / (br[1]-tl[1])]
-                uv = point2UV(Geom::Point3d.new((pt.x-tl[0]) / (br[0]-tl[0]), 1 - (pt.y-tl[1]) / (br[1]-tl[1]), 1))
+              v = ent.outer_loop.vertices	# can only set up to 4 vertices
+              v.each_index do |i|
+                pt = v[i].position
+                next if pt.on_line?([v[i-1], v[(i+1)%v.length]])	# skip colinear points - can't do anything useful with them
+                pos << pt
+                spt = view.screen_coords(pt)
+                uv = point2UV(Geom::Point3d.new((spt.x-tl[0]) / (br[0]-tl[0]), 1 - (spt.y-tl[1]) / (br[1]-tl[1]), 1))
                 pos << Geom::Point3d.new(uv[0], uv[1], 1)
               end
-              ent.position_material(material, pos, front)
+              pos = pos[0..7]
+              while true
+                begin
+                  ent.position_material(material, pos, front)
+                  break
+                rescue => e
+                  pos = pos[0...-2]		# Try with fewer points
+                  raise e if pos.length<=0	# eh?
+                end
+              end
             end
           end
         end
