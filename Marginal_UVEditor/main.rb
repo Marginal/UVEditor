@@ -159,6 +159,7 @@ module Marginal
           @dialog.add_action_callback("on_update")       { |d,p| on_update() }
           @dialog.add_action_callback("on_finishupdate") { |d,p| on_finishupdate() }
           @dialog.add_action_callback("on_cancelupdate") { |d,p| on_cancelupdate() }
+          @dialog.add_action_callback("on_projview")     { |d,p| on_projview() }
           @dialog.add_action_callback("on_export")       { |d,p| on_export() }
           @dialog.add_action_callback("on_help")         { |d,p| on_help() }
           @dialog.set_on_close { on_close() }
@@ -334,6 +335,11 @@ module Marginal
         if @model and @model.valid?	# its our model
           on_load()
         end
+      end
+
+      def on_projview
+        p 'on_projview' if TraceEvents
+        Marginal::UVEditor::from_view
       end
 
       def on_export

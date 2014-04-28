@@ -1,6 +1,6 @@
 /* UV Editor */
 
-/* exported init, clear, restart, export_layout, help */
+/* exported init, clear, restart, proj_view, export_layout, help */
 
 //XXX "use strict";
 
@@ -655,7 +655,7 @@ function clear()
     polys = undefined;
     saved_uvs = undefined;
     change_mode(modes.SELECT);	// cancel any ongoing operation
-    document.getElementById('tb-select').disabled = document.getElementById('tb-move').disabled = document.getElementById('tb-rotate').disabled = document.getElementById('tb-scale').disabled = document.getElementById('tb-save').disabled = true;
+    document.getElementById('tb-select').disabled = document.getElementById('tb-move').disabled = document.getElementById('tb-rotate').disabled = document.getElementById('tb-scale').disabled = document.getElementById('tb-projview').disabled = document.getElementById('tb-save').disabled = true;
 }
 
 
@@ -667,7 +667,7 @@ function restart()
     selection = {};
     saved_uvs = undefined;
     change_mode(modes.SELECT);	// cancel any ongoing operation
-    document.getElementById('tb-select').disabled = document.getElementById('tb-move').disabled = document.getElementById('tb-rotate').disabled = document.getElementById('tb-scale').disabled = document.getElementById('tb-save').disabled = false;
+    document.getElementById('tb-select').disabled = document.getElementById('tb-move').disabled = document.getElementById('tb-rotate').disabled = document.getElementById('tb-scale').disabled = document.getElementById('tb-projview').disabled = document.getElementById('tb-save').disabled = false;
 }
 
 
@@ -823,6 +823,11 @@ function canvas2uv(coord)
 function uvround(uv)
 {
     return [Math.round(uv[0]*uvFactor) * uvInverse, Math.round(uv[1]*uvFactor) * uvInverse];
+}
+
+function proj_view()
+{
+    window.location="skp:on_projview";
 }
 
 function export_layout()
