@@ -158,6 +158,26 @@ function on_keydown(e)
         e.stopPropagation();
         return false;
     }
+    else if (e.keyCode == 65 && e.ctrlKey)	// select All
+    {
+        selection = {};
+        for (var idx=0; idx<uvs.length; idx++) selection[idx] = true;
+        selection_is_temporary = false;
+        selection_centroid = centroid_of_selection();
+        redraw();
+        e.stopPropagation();
+        return false;
+    }
+    else if (e.keyCode == 84 && e.ctrlKey)	// select None
+    {
+        selection = {};
+        selection_is_temporary = false;
+        selection_centroid  = undefined;
+        redraw();
+        e.stopPropagation();
+        return false;
+    }
+
     return true;
 }
 
@@ -174,6 +194,21 @@ function on_keypress(e)
         change_mode(modes.ROTATE);
     else if ((c=="s" || c=="S" || (c=="9" && e.metaKey)) && !document.getElementById('tb-scale').disabled)
         change_mode(modes.SCALE);
+    else if (c=="a" || c=="A")	// select All
+    {
+        selection = {};
+        for (var idx=0; idx<uvs.length; idx++) selection[idx] = true;
+        selection_is_temporary = false;
+        selection_centroid = centroid_of_selection();
+        redraw();
+    }
+    else if (c=="n" || c=="N")	// select None
+    {
+        selection = {};
+        selection_is_temporary = false;
+        selection_centroid  = undefined;
+        redraw();
+    }
 }
 
 
