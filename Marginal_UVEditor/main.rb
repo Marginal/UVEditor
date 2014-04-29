@@ -256,7 +256,7 @@ module Marginal
           end
         end
 
-        url = 'file:///' + newfile.gsub('%','%25').gsub(';','%3B').gsub('?','%3F').gsub('\\','/')	# minimal escaping
+        url = 'file:///' + newfile.gsub('%','%25').gsub("'",'%27').gsub(';','%3B').gsub('?','%3F').gsub('\\','/')	# minimal escaping
         @dialog.execute_script("document.getElementById('thetexture').src='#{url}'; uvs=#{@uvs.inspect}; polys=#{polys.inspect}; restart()");
       end
 
