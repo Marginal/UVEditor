@@ -9,50 +9,17 @@ module Marginal
       model = Sketchup.active_model
       view = model.active_view
       selection = model.selection
-      tl = view.corner(0)	# always [0,0] ?
-      br = view.corner(3)
 
-      mymaterial = material_from_selection(selection)
-      return if !mymaterial
-      basename = mymaterial.texture.filename[/[^\/\\]+$/]	# basename which handles \ on Mac
-
-      @@theeditor.remove_observers(model)
-      model.start_operation('Project Texture', true)
+      usedmaterials = Hash.new(0)
+      mymaterial = material_from_selection(selection, usedmaterials)
+      return if usedmaterials.empty?
+      byuse = usedmaterials.invert
+      mymaterial = byuse[byuse.keys.sort[-1]]	# most popular material
 
       begin
-        selection.each do |ent|
-          if !ent.is_a?(Sketchup::Face)
-            selection.toggle(ent)	# not interested in anything else
-          elsif (!ent.material || !ent.material.texture || ent.material.texture.filename[/[^\/\\]+$/]!=basename) && (!ent.back_material || !ent.back_material.texture || ent.back_material.texture.filename[/[^\/\\]+$/]!=basename)
-            selection.toggle(ent)	# doesn't use our texture
-          else
-            [true,false].each do |front|
-              material = front ? ent.material : ent.back_material
-              next if not material or not material.texture or material.texture.filename[/[^\/\\]+$/]!=basename
-              pos = []
-              v = ent.outer_loop.vertices	# can only set up to 4 vertices
-              v.each_index do |i|
-                pt = v[i].position
-                next if pt.on_line?([v[i-1], v[(i+1)%v.length]])	# skip colinear points - can't do anything useful with them
-                pos << pt
-                spt = view.screen_coords(pt)
-                uv = point2UV(Geom::Point3d.new((spt.x-tl[0]) / (br[0]-tl[0]), 1 - (spt.y-tl[1]) / (br[1]-tl[1]), 1))
-                pos << Geom::Point3d.new(uv[0], uv[1], 1)
-              end
-              pos = pos[0..7]
-              while true
-                begin
-                  ent.position_material(material, pos, front)
-                  break
-                rescue => e
-                  pos = pos[0...-2]		# Try with fewer points
-                  raise e if pos.length<=0	# eh?
-                end
-              end
-            end
-          end
-        end
-        
+        @@theeditor.remove_observers(model)
+        model.start_operation('Project Texture', true)
+        entities_from_view(selection, view, mymaterial, selection.to_a)		# convert to array since selection changes under SketchUp 2014
         @@theeditor.install_observers(model)
         model.commit_operation
         @@theeditor.launch
@@ -62,6 +29,44 @@ module Marginal
         model.abort_operation
         @@theeditor.install_observers(model)
         UI::messagebox("Could not project all faces' UVs.\nTry with fewer faces selected.")
+      end
+
+    end
+
+    def self.entities_from_view(selection, view, material, entities)
+      tl = view.corner(0)	# always [0,0] ?
+      br = view.corner(3)
+      entities.each do |ent|
+        case ent
+        when Sketchup::ComponentInstance
+          entities_from_view(selection, view, material, ent.definition.entities)
+        when Sketchup::Group
+          entities_from_view(selection, view, material, ent.entities)
+        when Sketchup::Face
+          ent.material = material
+          ent.back_material = nil
+          pos = []
+          v = ent.outer_loop.vertices
+          v.each_index do |i|
+            pt = v[i].position
+            next if pt.on_line?([v[i-1], v[(i+1)%v.length]])	# skip colinear points - can't do anything useful with them
+            spt = view.screen_coords(pt)
+            uv = point2UV(Geom::Point3d.new((spt.x-tl[0]) / (br[0]-tl[0]), 1 - (spt.y-tl[1]) / (br[1]-tl[1]), 1))
+            pos << pt
+            pos << Geom::Point3d.new(uv[0], uv[1], 1)
+          end
+          pos = pos[0..7]	# can only set up to 4 vertices
+          while true
+            begin
+              ent.position_material(material, pos, true)
+              break
+            rescue ArgumentError => e
+              p pos	# Report to console
+              pos = pos[0...-2]		# Try with fewer points
+              raise e if pos.length<=0	# eh?
+            end
+          end
+        end
       end
 
     end

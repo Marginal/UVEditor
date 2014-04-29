@@ -15,10 +15,14 @@ module Marginal
     end
 
     # Determine most used material
-    def self.material_from_selection(selection)
-      usedmaterials = Hash.new(0)
-      selection.each do |ent|
-        if ent.is_a?(Sketchup::Face)	# not interested in anything else, and don't recurse into Components
+    def self.material_from_selection(entities, usedmaterials)
+      entities.each do |ent|
+        case ent
+        when Sketchup::ComponentInstance
+          material_from_selection(ent.definition.entities, usedmaterials)
+        when Sketchup::Group
+          material_from_selection(ent.entities, usedmaterials)
+        when Sketchup::Face
           [true,false].each do |front|
             material = front ? ent.material : ent.back_material
             if material and material.texture
@@ -27,9 +31,6 @@ module Marginal
           end
         end
       end
-      return nil if usedmaterials.empty?
-      byuse = usedmaterials.invert
-      return byuse[byuse.keys.sort[-1]]	# most popular material
     end
 
   end

@@ -27,10 +27,6 @@ module Marginal
         Marginal::UVEditor::theeditor.goodbye(model)
       end
 
-      # def onTransactionStart(model)
-      #   p "onTransactionStart #{model}" if TraceEvents
-      # end
-
       def onTransactionCommit(model)
         p "onTransactionCommit #{model}" if TraceEvents
         Marginal::UVEditor::theeditor.transaction()
@@ -44,6 +40,16 @@ module Marginal
       def onTransactionUndo(model)
         p "onTransactionUndo #{model}" if TraceEvents
         Marginal::UVEditor::theeditor.transaction()
+      end
+
+      if TraceEvents	# Don't need to know about these, other than for debug
+        def onTransactionStart(model)
+          p "onTransactionStart #{model}"
+        end
+
+        def onTransactionAbort(model)
+          p "onTransactionAbort #{model}"
+        end
       end
 
     end
@@ -196,24 +202,27 @@ module Marginal
         return if !@dialog
 
         @model = selection.model
-        facedata = {}
-        uvlookup = {}
-        polys = []
+        @seen_components = {}
+        @uvlookup = {}
+        @polys = []
 
-        mymaterial = Marginal::UVEditor.material_from_selection(selection)
-        return clear_selection() if !mymaterial
+        usedmaterials = Hash.new(0)
+        Marginal::UVEditor.material_from_selection(selection, usedmaterials)
+        return clear_selection() if usedmaterials.empty?
+        byuse = usedmaterials.invert
+        mymaterial = byuse[byuse.keys.sort[-1]]	# most popular material
 
         # Ensure material's texture is available in the file system
         newfile = mymaterial.texture.filename
-        basename = mymaterial.texture.filename[/[^\/\\]+$/]	# basename which handles \ on Mac
-        if !File.file?(newfile) || newfile==basename	# doesn't exist or unqualified
-          newfile = File.join(File.dirname(@model.path), basename)
+        @basename = mymaterial.texture.filename[/[^\/\\]+$/]	# basename which handles \ on Mac
+        if !File.file?(newfile) || newfile==@basename	# doesn't exist or unqualified
+          newfile = File.join(File.dirname(@model.path), @basename)
           if !File.file? newfile
-            selection.each do |ent|
-              if ent.is_a?(Sketchup::Face) and ent.material == mymaterial
+            selection.grep(Sketchup::Face).each do |ent|
+              if ent.material == mymaterial
                 raise "Can't write #{newfile}" if @tw.load(ent, true)==0 || @tw.write(ent, true, newfile)!=0
                 break
-              elsif ent.is_a?(Sketchup::Face) and ent.back_material == mymaterial
+              elsif ent.back_material == mymaterial
                 raise "Can't write #{newfile}" if @tw.load(ent, false)==0 || @tw.write(ent, false, newfile)!=0
                 break
               end
@@ -221,16 +230,32 @@ module Marginal
           end
         end
 
-        selection.each do |ent|
-          if !ent.is_a?(Sketchup::Face)
-            # selection.toggle(ent)	# not interested in anything else
-          elsif (!ent.material || !ent.material.texture || ent.material.texture.filename[/[^\/\\]+$/]!=basename) && (!ent.back_material || !ent.back_material.texture || ent.back_material.texture.filename[/[^\/\\]+$/]!=basename)
-            # selection.toggle(ent)	# doesn't use our texture
-          else
+        accum_faces(selection)
+
+        url = 'file:///' + newfile.gsub('%','%25').gsub("'",'%27').gsub(';','%3B').gsub('?','%3F').gsub('\\','/')	# minimal escaping
+        @dialog.execute_script("document.getElementById('thetexture').src='#{url}'; uvs=#{@uvs.inspect}; polys=#{@polys.inspect}; restart()");
+
+        # don't need this stuff any more
+        @seen_components = {}
+        @uvlookup = {}
+        @polys = []
+      end
+
+      def accum_faces(entities)
+        entities.each do |ent|
+          case ent
+          when Sketchup::ComponentInstance
+            if !@seen_components[ent.definition]	# do each Component at most once
+              @seen_components[ent.definition] = true
+              accum_faces(ent.definition.entities)
+            end
+          when Sketchup::Group
+            accum_faces(ent.entities)
+          when Sketchup::Face
             uvHelp = ent.get_UVHelper(true, true, @tw)
             [true,false].each do |front|
               material = front ? ent.material : ent.back_material
-              next if not material or not material.texture or material.texture.filename[/[^\/\\]+$/]!=basename
+              next if not material or not material.texture or material.texture.filename[/[^\/\\]+$/]!=@basename
               poly = []
               #pos = []	# debug
               v = ent.outer_loop.vertices
@@ -238,9 +263,9 @@ module Marginal
                 pt = v[i].position
                 next if pt.on_line?([v[i-1], v[(i+1)%v.length]])	# skip colinear points - can't do anything useful with them
                 uv = Marginal::UVEditor.point2UV(front ? uvHelp.get_front_UVQ(pt) : uvHelp.get_back_UVQ(pt))
-                idx = uvlookup[uv]
+                idx = @uvlookup[uv]
                 if !idx
-                  idx = uvlookup[uv] = @uvs.length
+                  idx = @uvlookup[uv] = @uvs.length
                   @uvs << uv
                   @facelookup << []
                 end
@@ -249,15 +274,12 @@ module Marginal
                 #pos << vertex	# debug
                 #pos << uv	# debug
               end
-              polys << poly
+              @polys << poly
               @idxlookup[[ent,front]] = poly
               #p "old: #{pos.inspect} #{front}"	# debug
             end
           end
         end
-
-        url = 'file:///' + newfile.gsub('%','%25').gsub("'",'%27').gsub(';','%3B').gsub('?','%3F').gsub('\\','/')	# minimal escaping
-        @dialog.execute_script("document.getElementById('thetexture').src='#{url}'; uvs=#{@uvs.inspect}; polys=#{polys.inspect}; restart()");
       end
 
       # a model is going away
@@ -311,7 +333,7 @@ module Marginal
             ent.position_material(front ? ent.material : ent.back_material, pos[0..7], front)
           rescue => e
             # silently ignore failure to project
-            puts "Error: #{e.inspect} #{pos[0..7].inspect}", e.backtrace	# Report to console
+            p "Error: #{e.inspect}", pos[0..7], e.backtrace[0]	# Report to console
           end
           #p "new: #{pos.inspect} #{front}"
         end
