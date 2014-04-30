@@ -16,10 +16,14 @@ module Marginal
       byuse = usedmaterials.invert
       mymaterial = byuse[byuse.keys.sort[-1]]	# most popular material
 
+      tl = [ 1024*1024,  1024*1024]
+      br = [-1024*1024, -1024*1024]
+      bounds_from_view(selection, view, Geom::Transformation.new, tl, br)
+
       begin
         @@theeditor.remove_observers(model)
         model.start_operation('Project Texture', true)
-        entities_from_view(selection, view, mymaterial, selection.to_a)		# convert to array since selection changes under SketchUp 2014
+        entities_from_view(selection.to_a, view, Geom::Transformation.new, tl, br, selection, mymaterial)	# convert selection to array since selection changes under SketchUp 2014
         @@theeditor.install_observers(model)
         model.commit_operation
         @@theeditor.launch
@@ -33,15 +37,32 @@ module Marginal
 
     end
 
-    def self.entities_from_view(selection, view, material, entities)
-      tl = view.corner(0)	# always [0,0] ?
-      br = view.corner(3)
+    def self.bounds_from_view(entities, view, trans, tl, br)
       entities.each do |ent|
         case ent
         when Sketchup::ComponentInstance
-          entities_from_view(selection, view, material, ent.definition.entities)
+          bounds_from_view(ent.definition.entities, view, trans*ent.transformation, tl, br)
         when Sketchup::Group
-          entities_from_view(selection, view, material, ent.entities)
+          bounds_from_view(ent.entities, view, trans*ent.transformation, tl, br)
+        when Sketchup::Face
+          spt = ent.outer_loop.vertices.map { |v| view.screen_coords(trans * v.position) }
+          tl[0] = (spt.map{ |s| s.x } << tl[0]).min
+          tl[1] = (spt.map{ |s| s.y } << tl[1]).min
+          br[0] = (spt.map{ |s| s.x } << br[0]).max
+          br[1] = (spt.map{ |s| s.y } << br[1]).max
+        end
+      end
+    end
+
+    def self.entities_from_view(entities, view, trans, tl, br, selection, material)
+      entities.each do |ent|
+        case ent
+        when Sketchup::ComponentInstance
+          ent.material = nil
+          entities_from_view(ent.definition.entities, view, trans*ent.transformation, tl, br, selection, material)
+        when Sketchup::Group
+          ent.material = nil
+          entities_from_view(ent.entities, view, trans*ent.transformation, tl, br, selection, material)
         when Sketchup::Face
           ent.material = material
           ent.back_material = nil
@@ -50,7 +71,7 @@ module Marginal
           v.each_index do |i|
             pt = v[i].position
             next if pt.on_line?([v[i-1], v[(i+1)%v.length]])	# skip colinear points - can't do anything useful with them
-            spt = view.screen_coords(pt)
+            spt = view.screen_coords(trans * pt)
             uv = point2UV(Geom::Point3d.new((spt.x-tl[0]) / (br[0]-tl[0]), 1 - (spt.y-tl[1]) / (br[1]-tl[1]), 1))
             pos << pt
             pos << Geom::Point3d.new(uv[0], uv[1], 1)
@@ -66,6 +87,10 @@ module Marginal
               raise e if pos.length<=0	# eh?
             end
           end
+        when Sketchup::Edge
+          # do nothing
+        else
+          selection.toggle(ent)	# not usable
         end
       end
 
